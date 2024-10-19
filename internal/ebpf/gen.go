@@ -1,3 +1,3 @@
 package ebpf
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go nwpktcounter nwpktcounter.c
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go nwpktcounter packet_counter.c
