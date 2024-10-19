@@ -11,7 +11,7 @@ struct {
 } pkt_count_map SEC(".maps");
 
 SEC("xdp")
-int xdp_prog() {
+int xdp_packet_counter() {
     __u32 key = 0;
     __u64 *value = bpf_map_lookup_elem(&pkt_count_map, &key);
     if (value) {
