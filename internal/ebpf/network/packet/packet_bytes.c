@@ -1,3 +1,4 @@
+//go:build ignore
 
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
@@ -22,3 +23,5 @@ int xdp_packet_bytes(struct xdp_md* ctx) {
     }
     return XDP_PASS;
 }
+
+char _license[] SEC("license") = "GPL";
