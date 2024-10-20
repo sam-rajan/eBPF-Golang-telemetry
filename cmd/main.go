@@ -15,8 +15,8 @@ func main() {
 		log.Fatal("eBPF not supported by the Kernel")
 	}
 
-	packetCount := &network.PacketCount{
+	packetSize := &network.PacketBytes{
 		EthInterface: "wlp2s0",
 	}
-	packetCount.Load()
+	packetSize.Load()
 }
