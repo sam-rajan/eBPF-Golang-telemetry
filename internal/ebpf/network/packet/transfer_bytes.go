@@ -16,20 +16,23 @@ type PacketBytes struct {
 	TotalBytes   int64
 }
 
-func (p *PacketBytes) Load() {
+func (p *PacketBytes) Load() error {
 	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatal("Failed to remove the resource constraint Error:", err)
+		log.Println("Failed to remove the resource constraint")
+		return err
 	}
 
 	var bytesObjects PacketBytesObjects
 	if err := LoadPacketBytesObjects(&bytesObjects, nil); err != nil {
-		log.Fatal("Failed to load bytesObjects Error:", err)
+		log.Println("Failed to load eBPF objects")
+		return err
 	}
 	defer bytesObjects.Close()
 
 	iface, err := net.InterfaceByName(p.EthInterface)
 	if err != nil {
-		log.Fatal("Failed to get network interface Error:", err)
+		log.Println("Failed to get network interface for getting traffic bytes")
+		return err
 	}
 
 	link, err := link.AttachXDP(link.XDPOptions{
@@ -38,7 +41,8 @@ func (p *PacketBytes) Load() {
 	})
 
 	if err != nil {
-		log.Fatal("Failed to attach XDP program to interface Error:", err)
+		log.Println("Failed to attach XDP program to interface")
+		return err
 	}
 	defer link.Close()
 
@@ -59,7 +63,7 @@ func (p *PacketBytes) Load() {
 			log.Printf("Total Size of packets received: %d", count)
 		case <-stop:
 			log.Println("Received signal, exiting...")
-			return
+			return nil
 		}
 	}
 }
