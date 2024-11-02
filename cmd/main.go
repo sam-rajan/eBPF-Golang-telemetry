@@ -15,6 +15,8 @@ func main() {
 		log.Fatal("eBPF not supported by the Kernel")
 	}
 
-	var packetSize = &network.PacketDrops{}
+	var packetSize = &network.PacketReceiveBytes{
+		EthInterface: "wlp2s0",
+	}
 	packetSize.Load()
 }
