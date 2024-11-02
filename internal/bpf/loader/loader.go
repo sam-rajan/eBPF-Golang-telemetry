@@ -1,4 +1,4 @@
-package ebpf
+package loader
 
 type EbpfLoader interface {
 	Load() error

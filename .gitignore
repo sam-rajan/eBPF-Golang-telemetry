@@ -23,7 +23,7 @@ go.work.sum
 
 # env file
 .env
-
+.vscode/
 *.o
 *_bpfeb.go
 *_bpfel.go

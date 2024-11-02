@@ -7,23 +7,26 @@ import (
 	"os/signal"
 	"time"
 
+	network "eBPF-Golang-telemetry/internal/bpf/network"
+
+	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
 )
 
-type PacketBytes struct {
+type PacketSentBytes struct {
 	EthInterface string
 	TotalBytes   int64
 }
 
-func (p *PacketBytes) Load() error {
+func (p *PacketSentBytes) Load() error {
 	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Println("Failed to remove the resource constraint")
 		return err
 	}
 
-	var bytesObjects PacketBytesObjects
-	if err := LoadPacketBytesObjects(&bytesObjects, nil); err != nil {
+	var bytesObjects network.PacketSendObjects
+	if err := network.LoadPacketSendObjects(&bytesObjects, nil); err != nil {
 		log.Println("Failed to load eBPF objects")
 		return err
 	}
@@ -31,17 +34,18 @@ func (p *PacketBytes) Load() error {
 
 	iface, err := net.InterfaceByName(p.EthInterface)
 	if err != nil {
-		log.Println("Failed to get network interface for getting traffic bytes")
+		log.Println("Failed to get network interface for inspecting traffic")
 		return err
 	}
 
-	link, err := link.AttachXDP(link.XDPOptions{
-		Program:   bytesObjects.XdpPacketBytes,
+	link, err := link.AttachTCX(link.TCXOptions{
 		Interface: iface.Index,
+		Program:   bytesObjects.TcSentPacket,
+		Attach:    ebpf.AttachTCXIngress,
 	})
 
 	if err != nil {
-		log.Println("Failed to attach XDP program to interface")
+		log.Println("Failed to attach eBPF program to interface", err)
 		return err
 	}
 	defer link.Close()
@@ -55,12 +59,12 @@ func (p *PacketBytes) Load() error {
 		select {
 		case <-tick:
 			var count uint64
-			err := bytesObjects.PktBytesMap.Lookup(uint32(0), &count)
+			err := bytesObjects.PktMaps.Lookup(uint32(3), &count)
 			if err != nil {
 				log.Fatal("Failed to lookup packet bytes Error:", err)
 			}
 
-			log.Printf("Total Size of packets received: %d", count)
+			log.Printf("Total Size of packets sent: %d", count)
 		case <-stop:
 			log.Println("Received signal, exiting...")
 			return nil

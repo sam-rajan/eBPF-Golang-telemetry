@@ -1,8 +1,8 @@
 package network
 
 import (
+	"eBPF-Golang-telemetry/internal/bpf/network"
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"time"
@@ -11,37 +11,28 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 )
 
-type PacketCount struct {
-	EthInterface string
+type PacketDrops struct {
 	TotalPackets int64
 }
 
-func (p *PacketCount) Load() error {
+func (p *PacketDrops) Load() error {
 	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Println("Failed to remove the resource constraint")
 		return err
 	}
 
-	var counterObjs PacketCounterObjects
-	if err := LoadPacketCounterObjects(&counterObjs, nil); err != nil {
+	var dropPbjects network.PacketDropObjects
+	if err := network.LoadPacketDropObjects(&dropPbjects, nil); err != nil {
 		log.Println("Failed to load eBPF objects")
+		log.Fatal(err)
 		return err
 	}
-	defer counterObjs.Close()
+	defer dropPbjects.Close()
 
-	iface, err := net.InterfaceByName(p.EthInterface)
-	if err != nil {
-		log.Println("Failed to get network interface for getting packet counts")
-		return err
-	}
-
-	link, err := link.AttachXDP(link.XDPOptions{
-		Program:   counterObjs.XdpPacketCounter,
-		Interface: iface.Index,
-	})
+	link, err := link.Tracepoint("skb", "kfree_skb", dropPbjects.CountPacketDrops, nil)
 
 	if err != nil {
-		log.Println("Failed to attach XDP program to interface")
+		log.Println("Failed to link Tracepoint program")
 		return err
 	}
 	defer link.Close()
@@ -55,13 +46,13 @@ func (p *PacketCount) Load() error {
 		select {
 		case <-tick:
 			var count uint64
-			err := counterObjs.PktCountMap.Lookup(uint32(0), &count)
+			err := dropPbjects.PktMaps.Lookup(uint32(4), &count)
 			if err != nil {
 				log.Println("Failed to lookup packet count")
 				return err
 			}
 
-			log.Printf("Number of packets received: %d", count)
+			log.Printf("Number of packets dropped: %d", count)
 		case <-stop:
 			log.Println("Received signal, exiting...")
 			return nil

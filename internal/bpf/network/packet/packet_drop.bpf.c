@@ -1,15 +1,5 @@
 //go:build ignore
-
-
-#include <linux/bpf.h>
-#include <bpf/bpf_helpers.h>
-
-struct {
-    __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 1);
-    __type(key, __u32);
-    __type(value, __u64);
-} drop_count SEC(".maps");
+#include "packets.h"
 
 SEC("tracepoint/skb/kfree_skb")
 int count_packet_drops(void *ctx)
@@ -34,12 +24,7 @@ int count_packet_drops(void *ctx)
         return 0;
     }
 
-    // Increment the drop count
-    __u32 key = 0;
-    __u64 *count = bpf_map_lookup_elem(&drop_count, &key);
-    if (count) {
-        __sync_fetch_and_add(count, 1);
-    }
+    update_pkt_map(DROPPED_PACKETS, 1);
 
     return 0;
 }
