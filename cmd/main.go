@@ -1,7 +1,7 @@
 package main
 
 import (
-	network "eBPF-Golang-telemetry/internal/bpf/network/packet"
+	"eBPF-Golang-telemetry/internal/bpf/loader/network"
 	"errors"
 	"log"
 
@@ -15,8 +15,6 @@ func main() {
 		log.Fatal("eBPF not supported by the Kernel")
 	}
 
-	var packetSize = &network.PacketDrops{
-		EthInterface: "wlp2s0",
-	}
+	var packetSize = &network.PacketDrops{}
 	packetSize.Load()
 }
