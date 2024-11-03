@@ -1,9 +1,12 @@
 package main
 
 import (
-	"eBPF-Golang-telemetry/internal/bpf/loader/network"
+	"context"
 	"errors"
 	"log"
+	"net/http"
+
+	"eBPF-Golang-telemetry/internal/otel"
 
 	eBPF "github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/features"
@@ -15,8 +18,22 @@ func main() {
 		log.Fatal("eBPF not supported by the Kernel")
 	}
 
-	var packetSize = &network.PacketReceiveBytes{
-		EthInterface: "wlp2s0",
+	otelShutdown, err := otel.SetupOtel(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to setup otel. Reason : %s", err.Error())
 	}
-	packetSize.Load()
+	// Handle shutdown properly so nothing leaks.
+	defer func() {
+		err = errors.Join(err, otelShutdown(context.Background()))
+	}()
+
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+	err = http.ListenAndServe(":9000", nil)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 }
