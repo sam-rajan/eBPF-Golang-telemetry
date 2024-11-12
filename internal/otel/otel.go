@@ -3,6 +3,7 @@ package otel
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -11,6 +12,9 @@ import (
 )
 
 func SetupOtel(ctx context.Context) (shutdown func(context.Context) error, err error) {
+
+	log.Println("Initializing OpenTelemetry")
+
 	var shutdownFuncs []func(context.Context) error
 
 	shutdown = func(ctx context.Context) error {
@@ -25,18 +29,18 @@ func SetupOtel(ctx context.Context) (shutdown func(context.Context) error, err e
 		err = errors.Join(inErr, shutdown(ctx))
 	}
 
-	meterProvider, err := newMeterProvider()
+	metricsProvider, err := newMetricsProvider()
 	if err != nil {
 		handleErr(err)
 		return
 	}
-	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
-	otel.SetMeterProvider(meterProvider)
-
+	shutdownFuncs = append(shutdownFuncs, metricsProvider.Shutdown)
+	otel.SetMeterProvider(metricsProvider)
+	log.Println("OpenTelemetry initialized")
 	return
 }
 
-func newMeterProvider() (*metric.MeterProvider, error) {
+func newMetricsProvider() (*metric.MeterProvider, error) {
 	metricExporter, err := stdoutmetric.New()
 	if err != nil {
 		return nil, err

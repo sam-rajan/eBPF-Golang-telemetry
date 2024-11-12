@@ -3,59 +3,56 @@ package network
 import (
 	"eBPF-Golang-telemetry/internal/bpf/network"
 	"log"
-	"os"
-	"os/signal"
-	"time"
 
 	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/rlimit"
 )
 
 type PacketDrops struct {
-	TotalPackets int64
+	ebpfObject network.PacketDropObjects
+	link       *link.Link
 }
 
 func (p *PacketDrops) Load() error {
-	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Println("Failed to remove the resource constraint")
-		return err
-	}
 
-	var dropPbjects network.PacketDropObjects
-	if err := network.LoadPacketDropObjects(&dropPbjects, nil); err != nil {
+	if err := network.LoadPacketDropObjects(&p.ebpfObject, nil); err != nil {
 		log.Println("Failed to load eBPF objects")
 		log.Fatal(err)
 		return err
 	}
-	defer dropPbjects.Close()
 
-	link, err := link.Tracepoint("skb", "kfree_skb", dropPbjects.CountPacketDrops, nil)
-
+	link, err := link.Tracepoint("skb", "kfree_skb", p.ebpfObject.CountPacketDrops, nil)
+	p.link = &link
 	if err != nil {
 		log.Println("Failed to link Tracepoint program")
 		return err
 	}
-	defer link.Close()
 
-	tick := time.Tick(time.Second)
-	stop := make(chan os.Signal, 5)
+	return nil
+}
 
-	signal.Notify(stop, os.Interrupt)
-
-	for {
-		select {
-		case <-tick:
-			var count uint64
-			err := dropPbjects.PktMaps.Lookup(uint32(4), &count)
-			if err != nil {
-				log.Println("Failed to lookup packet count")
-				return err
-			}
-
-			log.Printf("Number of packets dropped: %d", count)
-		case <-stop:
-			log.Println("Received signal, exiting...")
-			return nil
-		}
+func (p *PacketDrops) GetValue() (int64, error) {
+	var value int64
+	err := p.ebpfObject.PktMaps.Lookup(int32(4), &value)
+	if err != nil {
+		log.Println("Failed to read network drop value from map")
+		return 0, err
 	}
+	return value, nil
+}
+
+func (p *PacketDrops) Unload() error {
+	err := (*p.link).Close()
+
+	if err != nil {
+		log.Println("Failed to close link")
+		return err
+	}
+	err = p.ebpfObject.Close()
+
+	if err != nil {
+		log.Println("Failed to close eBPF objects")
+		return err
+	}
+	log.Println("Unloaded network drop module")
+	return nil
 }
