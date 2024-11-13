@@ -56,3 +56,7 @@ func (p *PacketDrops) Unload() error {
 	log.Println("Unloaded network drop module")
 	return nil
 }
+
+func (p *PacketDrops) GetName() string {
+	return "ebpf.network.packet.drop_count"
+}

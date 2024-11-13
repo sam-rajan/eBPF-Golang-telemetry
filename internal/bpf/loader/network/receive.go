@@ -10,7 +10,6 @@ import (
 	network "eBPF-Golang-telemetry/internal/bpf/network"
 
 	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/rlimit"
 )
 
 type PacketReceiveBytes struct {
@@ -19,10 +18,6 @@ type PacketReceiveBytes struct {
 }
 
 func (p *PacketReceiveBytes) Load() error {
-	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Println("Failed to remove the resource constraint")
-		return err
-	}
 
 	var bytesObjects network.PacketReceiveObjects
 	if err := network.LoadPacketReceiveObjects(&bytesObjects, nil); err != nil {
