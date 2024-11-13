@@ -1,12 +1,20 @@
 package otel
 
 import (
+	"context"
 	ebpf "eBPF-Golang-telemetry/internal/bpf"
 	"log"
 	"os"
 	"os/signal"
 	"time"
+
+	opentelemetry "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
+
+var meter = opentelemetry.Meter("eBPF-Golang-telemetry")
+var counterMap = map[string]metric.Int64Counter{}
 
 func AccumulateMetrics() {
 
@@ -32,12 +40,18 @@ func AccumulateMetrics() {
 
 func accumulateValues() {
 	for _, controller := range ebpf.EbpfControllerList {
-		log.Println(controller.GetValue())
+		value, _ := controller.GetValue()
+		valueAttr := attribute.Int64("value", value)
+
+		counterMap[controller.GetName()].Add(context.Background(), 1,
+			metric.WithAttributes(valueAttr))
 	}
 }
 
 func loadEbpf() {
 	for _, controller := range ebpf.EbpfControllerList {
+
+		counterMap[controller.GetName()], _ = meter.Int64Counter(controller.GetName())
 		err := controller.Load()
 
 		if err != nil {
