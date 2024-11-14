@@ -76,6 +76,8 @@ func (p *PacketSentBytes) GetData() (result []metric.MetricData) {
 		Name:        "ebpf.network.packets.sent.count",
 		Description: "Number of sent network packets detected by eBPF",
 		Value:       packetCount,
+		Unit:        "{packets}",
+		Type:        metric.Counter,
 	}
 
 	result = append(result, metric1)
@@ -91,6 +93,8 @@ func (p *PacketSentBytes) GetData() (result []metric.MetricData) {
 		Name:        "ebpf.network.sent.bytes",
 		Description: "Total networks bytes sent detected by eBPF",
 		Value:       packetReceivedBytes,
+		Unit:        "By",
+		Type:        metric.Counter,
 	}
 
 	result = append(result, metric2)

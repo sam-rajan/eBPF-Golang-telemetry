@@ -62,6 +62,8 @@ func (p *PacketDrops) GetData() (result []metric.MetricData) {
 		Name:        "ebpf.network.packets.count",
 		Description: "Number of network packets detected by eBPF",
 		Value:       value,
+		Unit:        "{packets}",
+		Type:        metric.Counter,
 	}
 
 	result = append(result, data)

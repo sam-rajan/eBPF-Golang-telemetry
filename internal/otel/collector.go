@@ -14,6 +14,7 @@ import (
 
 var meter = opentelemetry.Meter("ebpf-telemetry")
 var counterMap = map[string]metric.Int64Counter{}
+var guageMap = map[string]metric.Int64Gauge{}
 var hostname, _ = os.Hostname()
 
 func CollectMetrics() {
@@ -21,17 +22,38 @@ func CollectMetrics() {
 	log.Println("Starting metrics collector")
 	ebpf.ListenForUpdates(func(md []ebpfMetric.MetricData) {
 		for _, metricData := range md {
-			counter, ok := counterMap[metricData.Name]
-			if !ok {
-				counter, _ = meter.Int64Counter(metricData.Name,
-					metric.WithDescription(metricData.Description), metric.WithUnit("{packets}"))
-				counterMap[metricData.Name] = counter
+			if metricData.Type == ebpfMetric.Gauge {
+				updateGaugeMetric(metricData)
+			} else if metricData.Type == ebpfMetric.Counter {
+				updateCounterMetric(metricData)
 			}
-			counter.Add(context.Background(), 1, metric.WithAttributes(
-				attribute.Int64("value", metricData.Value),
-				attribute.String("host", hostname),
-			))
 		}
 	})
 
+}
+
+func updateCounterMetric(metricData ebpfMetric.MetricData) {
+	counter, ok := counterMap[metricData.Name]
+	if !ok {
+		counter, _ = meter.Int64Counter(metricData.Name,
+			metric.WithDescription(metricData.Description), metric.WithUnit(metricData.Unit))
+		counterMap[metricData.Name] = counter
+	}
+	counter.Add(context.Background(), 1, metric.WithAttributes(
+		attribute.Int64("value", metricData.Value),
+		attribute.String("host", hostname),
+	))
+}
+
+func updateGaugeMetric(metricData ebpfMetric.MetricData) {
+	guage, ok := guageMap[metricData.Name]
+	if !ok {
+		guage, _ = meter.Int64Gauge(metricData.Name,
+			metric.WithDescription(metricData.Description), metric.WithUnit(metricData.Unit))
+		guageMap[metricData.Name] = guage
+	}
+	guage.Record(context.Background(), 1, metric.WithAttributes(
+		attribute.Int64("value", metricData.Value),
+		attribute.String("host", hostname),
+	))
 }
