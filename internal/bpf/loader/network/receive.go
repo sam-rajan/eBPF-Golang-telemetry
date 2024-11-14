@@ -3,10 +3,8 @@ package network
 import (
 	"log"
 	"net"
-	"os"
-	"os/signal"
-	"time"
 
+	"eBPF-Golang-telemetry/internal/bpf/metric"
 	network "eBPF-Golang-telemetry/internal/bpf/network"
 
 	"github.com/cilium/ebpf/link"
@@ -14,17 +12,16 @@ import (
 
 type PacketReceiveBytes struct {
 	EthInterface string
-	TotalBytes   int64
+	link         *link.Link
+	ebpfObject   network.PacketReceiveObjects
 }
 
 func (p *PacketReceiveBytes) Load() error {
 
-	var bytesObjects network.PacketReceiveObjects
-	if err := network.LoadPacketReceiveObjects(&bytesObjects, nil); err != nil {
+	if err := network.LoadPacketReceiveObjects(&p.ebpfObject, nil); err != nil {
 		log.Println("Failed to load eBPF objects")
 		return err
 	}
-	defer bytesObjects.Close()
 
 	iface, err := net.InterfaceByName(p.EthInterface)
 	if err != nil {
@@ -34,33 +31,67 @@ func (p *PacketReceiveBytes) Load() error {
 
 	link, err := link.AttachXDP(link.XDPOptions{
 		Interface: iface.Index,
-		Program:   bytesObjects.XdpRecievedPacket,
+		Program:   p.ebpfObject.XdpRecievedPacket,
 	})
 
 	if err != nil {
 		log.Println("Failed to attach eBPF program to interface", err)
 		return err
 	}
-	defer link.Close()
+	p.link = &link
 
-	tick := time.Tick(time.Second)
-	stop := make(chan os.Signal, 5)
+	return nil
+}
 
-	signal.Notify(stop, os.Interrupt)
+func (p *PacketReceiveBytes) Unload() error {
+	err := (*p.link).Close()
 
-	for {
-		select {
-		case <-tick:
-			var count uint64
-			err := bytesObjects.PktMaps.Lookup(uint32(0), &count)
-			if err != nil {
-				log.Fatal("Failed to lookup packet bytes Error:", err)
-			}
-
-			log.Printf("Total Size of packets received: %d", count)
-		case <-stop:
-			log.Println("Received signal, exiting...")
-			return nil
-		}
+	if err != nil {
+		log.Println("Failed to close link")
+		return err
 	}
+	err = p.ebpfObject.Close()
+
+	if err != nil {
+		log.Println("Failed to close eBPF objects")
+		return err
+	}
+	log.Println("Unloaded network drop module")
+	return nil
+}
+
+func (p *PacketReceiveBytes) GetData() (result []metric.MetricData) {
+	result = []metric.MetricData{}
+
+	var packetCount int64
+	err := p.ebpfObject.PktMaps.Lookup(int32(0), &packetCount)
+	if err != nil {
+		log.Println("Failed to read received packet count from map")
+		return
+	}
+
+	metric1 := metric.MetricData{
+		Name:        "ebpf.network.packets.received.count",
+		Description: "Number of received network packets detected by eBPF",
+		Value:       packetCount,
+	}
+
+	result = append(result, metric1)
+
+	var packetReceivedBytes int64
+	err = p.ebpfObject.PktMaps.Lookup(int32(1), &packetReceivedBytes)
+	if err != nil {
+		log.Println("Failed to read network received bytes from map")
+		return
+	}
+
+	metric2 := metric.MetricData{
+		Name:        "ebpf.network.received.bytes",
+		Description: "Total networks bytes received detected by eBPF",
+		Value:       packetReceivedBytes,
+	}
+
+	result = append(result, metric2)
+
+	return
 }

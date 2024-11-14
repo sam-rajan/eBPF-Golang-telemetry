@@ -1,6 +1,7 @@
 package network
 
 import (
+	"eBPF-Golang-telemetry/internal/bpf/metric"
 	"eBPF-Golang-telemetry/internal/bpf/network"
 	"log"
 
@@ -30,16 +31,6 @@ func (p *PacketDrops) Load() error {
 	return nil
 }
 
-func (p *PacketDrops) GetValue() (int64, error) {
-	var value int64
-	err := p.ebpfObject.PktMaps.Lookup(int32(4), &value)
-	if err != nil {
-		log.Println("Failed to read network drop value from map")
-		return 0, err
-	}
-	return value, nil
-}
-
 func (p *PacketDrops) Unload() error {
 	err := (*p.link).Close()
 
@@ -57,6 +48,22 @@ func (p *PacketDrops) Unload() error {
 	return nil
 }
 
-func (p *PacketDrops) GetName() string {
-	return "ebpf.network.packet.drop_count"
+func (p *PacketDrops) GetData() (result []metric.MetricData) {
+	result = []metric.MetricData{}
+
+	var value int64
+	err := p.ebpfObject.PktMaps.Lookup(int32(4), &value)
+	if err != nil {
+		log.Println("Failed to read network drop value from map")
+		return
+	}
+
+	data := metric.MetricData{
+		Name:        "ebpf.network.packets.count",
+		Description: "Number of network packets detected by eBPF",
+		Value:       value,
+	}
+
+	result = append(result, data)
+	return
 }

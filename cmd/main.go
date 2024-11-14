@@ -9,7 +9,6 @@ import (
 
 	eBPF "github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/features"
-	"github.com/cilium/ebpf/rlimit"
 )
 
 func main() {
@@ -21,10 +20,6 @@ func main() {
 
 	log.Println("eBPF supported by the Kernel")
 
-	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatal("Failed to remove the resource constraint. Error: ", err.Error())
-	}
-
 	otelShutdown, err := otel.SetupOtel(context.Background())
 	if err != nil {
 		log.Fatalf("Failed to setup otel. Reason : %s", err.Error())
@@ -35,5 +30,5 @@ func main() {
 		err = errors.Join(err, otelShutdown(context.Background()))
 	}()
 
-	otel.AccumulateMetrics()
+	otel.CollectMetrics()
 }
