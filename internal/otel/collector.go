@@ -35,25 +35,30 @@ func CollectMetrics() {
 func updateCounterMetric(metricData ebpfMetric.MetricData) {
 	counter, ok := counterMap[metricData.Name]
 	if !ok {
-		counter, _ = meter.Int64Counter(metricData.Name,
-			metric.WithDescription(metricData.Description), metric.WithUnit(metricData.Unit))
+		counter, _ = meter.Int64Counter(createParams(metricData))
 		counterMap[metricData.Name] = counter
 	}
-	counter.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.Int64("value", metricData.Value),
-		attribute.String("host", hostname),
-	))
+	counter.Add(context.Background(), 1, metric.WithAttributes(getAttributes(metricData)...))
 }
 
 func updateGaugeMetric(metricData ebpfMetric.MetricData) {
 	guage, ok := guageMap[metricData.Name]
 	if !ok {
-		guage, _ = meter.Int64Gauge(metricData.Name,
-			metric.WithDescription(metricData.Description), metric.WithUnit(metricData.Unit))
+		guage, _ = meter.Int64Gauge(createParams(metricData))
 		guageMap[metricData.Name] = guage
 	}
-	guage.Record(context.Background(), 1, metric.WithAttributes(
-		attribute.Int64("value", metricData.Value),
+	guage.Record(context.Background(), 1, metric.WithAttributes(getAttributes(metricData)...))
+}
+
+func createParams(metricData ebpfMetric.MetricData) (string, metric.InstrumentOption, metric.InstrumentOption) {
+	return metricData.Name, metric.WithDescription(metricData.Description), metric.WithUnit(metricData.Unit)
+}
+
+func getAttributes(metricData ebpfMetric.MetricData) []attribute.KeyValue {
+	attributes := []attribute.KeyValue{
 		attribute.String("host", hostname),
-	))
+		attribute.Int64("value", metricData.Value),
+	}
+
+	return attributes
 }

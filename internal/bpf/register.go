@@ -1,9 +1,12 @@
 package ebpf
 
-import "eBPF-Golang-telemetry/internal/bpf/loader/network"
+import (
+	"eBPF-Golang-telemetry/internal/bpf/loader/network"
+	"os"
+)
 
 var ebpfControllerList = []ebpfController{
 	&network.PacketDrops{},
-	&network.PacketReceiveBytes{EthInterface: "wlp2s0"},
-	&network.PacketSentBytes{EthInterface: "wlp2s0"},
+	&network.PacketReceiveBytes{EthInterface: os.Getenv("NET_INTERFACE")},
+	&network.PacketSentBytes{EthInterface: os.Getenv("NET_INTERFACE")},
 }
